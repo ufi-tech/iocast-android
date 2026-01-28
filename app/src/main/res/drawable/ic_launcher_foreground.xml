@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background circle -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"/>
+    <!-- Cast icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,34H34c-2.2,0 -4,1.8 -4,4v6h4v-6h40v28h-14v4h14c2.2,0 4,-1.8 4,-4V38C78,35.8 76.2,34 74,34z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,64v6h6C36,66.68 33.32,64 30,64z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,56v4c5.52,0 10,4.48 10,10h4C44,61.26 37.74,56 30,56z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,48v4c9.94,0 18,8.06 18,18h4C52,57.84 42.16,48 30,48z"/>
+</vector>

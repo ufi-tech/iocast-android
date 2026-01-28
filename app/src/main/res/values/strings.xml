@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IOCast</string>
+    <string name="app_description">Digital Signage Kiosk</string>
+
+    <!-- Setup Activity -->
+    <string name="setup_title">IOCast Setup</string>
+    <string name="setup_subtitle">Digital Signage Platform</string>
+    <string name="setup_scan_qr">Scan QR-kode</string>
+    <string name="scan_qr_code">Scan QR-kode</string>
+    <string name="or_manual_setup">— eller indtast manuelt —</string>
+    <string name="setup_manual">Manuel konfiguration</string>
+    <string name="setup_broker_url">MQTT Broker URL</string>
+    <string name="setup_broker_hint">tcp://188.228.60.134:1883</string>
+    <string name="hint_broker_url">MQTT Broker URL</string>
+    <string name="hint_device_id">Device ID</string>
+    <string name="hint_start_url">Start URL</string>
+    <string name="setup_username">Brugernavn</string>
+    <string name="setup_password">Adgangskode</string>
+    <string name="setup_device_id">Device ID</string>
+    <string name="setup_start_url">Start URL</string>
+    <string name="setup_start_url_hint">https://din-side.iocast.dk</string>
+    <string name="setup_save">Gem og start</string>
+    <string name="save_and_start">Gem og start</string>
+    <string name="setup_error_broker">Indtast broker URL</string>
+    <string name="setup_error_url">Indtast start URL</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">IOCast Service</string>
+    <string name="notification_channel_desc">Holder IOCast kørende</string>
+    <string name="notification_title">IOCast aktiv</string>
+    <string name="notification_text">Digital signage kører</string>
+
+    <!-- Status -->
+    <string name="status_connecting">Forbinder...</string>
+    <string name="status_connected">Forbundet</string>
+    <string name="status_disconnected">Ikke forbundet</string>
+    <string name="status_error">Fejl</string>
+
+    <!-- Errors -->
+    <string name="error_no_internet">Ingen internetforbindelse</string>
+    <string name="error_mqtt_failed">MQTT forbindelse fejlede</string>
+    <string name="error_page_load">Kunne ikke indlæse side</string>
+</resources>

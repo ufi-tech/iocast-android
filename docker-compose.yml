@@ -1,0 +1,56 @@
+services:
+  build:
+    image: thyrlian/android-sdk:latest
+    volumes:
+      - .:/project
+      - gradle-cache:/root/.gradle
+      - project-gradle:/project/.gradle
+      - app-build:/project/app/build
+    working_dir: /project
+    command: >
+      bash -c "
+        yes | sdkmanager --licenses 2>/dev/null || true &&
+        ./gradlew assembleDebug --no-daemon &&
+        cp /project/app/build/outputs/apk/debug/app-debug.apk /project/output/ 2>/dev/null || true
+      "
+    environment:
+      - GRADLE_OPTS=-Xmx3072m -XX:MaxMetaspaceSize=756m
+      - GRADLE_USER_HOME=/root/.gradle
+
+  build-release:
+    image: thyrlian/android-sdk:latest
+    volumes:
+      - .:/project
+      - gradle-cache:/root/.gradle
+      - project-gradle:/project/.gradle
+      - app-build:/project/app/build
+    working_dir: /project
+    command: >
+      bash -c "
+        yes | sdkmanager --licenses 2>/dev/null || true &&
+        ./gradlew assembleRelease --no-daemon &&
+        cp /project/app/build/outputs/apk/release/app-release-unsigned.apk /project/output/ 2>/dev/null || true
+      "
+    environment:
+      - GRADLE_OPTS=-Xmx3072m -XX:MaxMetaspaceSize=756m
+      - GRADLE_USER_HOME=/root/.gradle
+
+  shell:
+    image: thyrlian/android-sdk:latest
+    volumes:
+      - .:/project
+      - gradle-cache:/root/.gradle
+      - project-gradle:/project/.gradle
+      - app-build:/project/app/build
+    working_dir: /project
+    stdin_open: true
+    tty: true
+    command: bash
+    environment:
+      - GRADLE_OPTS=-Xmx3072m -XX:MaxMetaspaceSize=756m
+      - GRADLE_USER_HOME=/root/.gradle
+
+volumes:
+  gradle-cache:
+  project-gradle:
+  app-build:

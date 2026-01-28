@@ -1,0 +1,20 @@
+# Build outputs
+app/build/
+build/
+.gradle/
+output/
+
+# IDE
+.idea/
+*.iml
+
+# Local properties
+local.properties
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keystore (don't include in Docker context)
+*.keystore
+*.jks
