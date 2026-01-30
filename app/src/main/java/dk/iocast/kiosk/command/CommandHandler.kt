@@ -1,13 +1,17 @@
 package dk.iocast.kiosk.command
 
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import java.io.File
 import dk.iocast.kiosk.IOCastApp
 import dk.iocast.kiosk.util.DeviceInfo
 import dk.iocast.kiosk.util.TvController
@@ -73,6 +77,8 @@ class CommandHandler(private val context: Context) {
                 "wakeUp" -> handleWakeUp()
                 "setScreenTimeout" -> handleSetScreenTimeout(json)
                 "shutdown" -> handleShutdown()
+                // OTA Update command
+                "update" -> handleUpdate(json)
                 else -> CommandResult(false, "Unknown command: $command")
             }
         } catch (e: Exception) {
@@ -318,6 +324,55 @@ class CommandHandler(private val context: Context) {
             CommandResult(true, "Shutting down device")
         } else {
             CommandResult(false, "Shutdown failed - requires root or device owner")
+        }
+    }
+
+    // ========== OTA Update Command ==========
+
+    private fun handleUpdate(json: JSONObject): CommandResult {
+        val apkUrl = json.optString("url", "")
+        if (apkUrl.isEmpty()) {
+            return CommandResult(false, "Missing 'url' parameter")
+        }
+
+        return try {
+            Log.i(TAG, "Starting OTA update download from: $apkUrl")
+
+            // Delete old APK if exists
+            val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "iocast-update.apk")
+            if (apkFile.exists()) {
+                apkFile.delete()
+                Log.d(TAG, "Deleted old APK file")
+            }
+
+            // Create download request
+            val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
+                setTitle("IOCast Update")
+                setDescription("Downloader opdatering...")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "iocast-update.apk")
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(true)
+            }
+
+            // Start download
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = downloadManager.enqueue(request)
+
+            // Save download ID so DownloadReceiver can track it
+            IOCastApp.instance.prefs.pendingUpdateDownloadId = downloadId
+
+            Log.i(TAG, "Update download started with ID: $downloadId")
+
+            val data = JSONObject().apply {
+                put("downloadId", downloadId)
+                put("url", apkUrl)
+            }
+            CommandResult(true, "Update download started", data)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Update download failed: ${e.message}", e)
+            CommandResult(false, "Update failed: ${e.message}")
         }
     }
 
