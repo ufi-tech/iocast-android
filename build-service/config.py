@@ -24,7 +24,8 @@ GITHUB_REPO = os.getenv("GITHUB_REPO", "ufi-tech/iocast-android")
 # Build Configuration
 BUILD_CACHE_DIR = os.getenv("BUILD_CACHE_DIR", "/app/cache")
 BUILD_TIMEOUT = int(os.getenv("BUILD_TIMEOUT", "1800"))  # 30 minutes
-DOCKER_IMAGE = os.getenv("DOCKER_IMAGE", "mingc/android-build-box:latest")
+# Use cimg/android which has Java 17 by default (matches project requirements)
+DOCKER_IMAGE = os.getenv("DOCKER_IMAGE", "cimg/android:2024.01.1")
 
 # Paths
 RELEASES_DIR = os.getenv("RELEASES_DIR", "/app/releases")
