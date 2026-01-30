@@ -21,7 +21,7 @@ android {
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("KEYSTORE_PATH") ?: "signing/iocast-release.jks"
-            val keystoreFile = file(keystorePath)
+            val keystoreFile = rootProject.file(keystorePath)
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "iocast2026release"
@@ -34,15 +34,22 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // Only use release signing if keystore exists
+            val releaseSigningConfig = signingConfigs.findByName("release")
+            if (releaseSigningConfig?.storeFile?.exists() == true) {
+                signingConfig = releaseSigningConfig
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
         debug {
-            // Also use release signing for debug builds to ensure consistent signature
-            signingConfig = signingConfigs.getByName("release")
+            // Use release signing for debug builds if keystore exists (consistent OTA)
+            val releaseSigningConfig = signingConfigs.findByName("release")
+            if (releaseSigningConfig?.storeFile?.exists() == true) {
+                signingConfig = releaseSigningConfig
+            }
         }
     }
 
