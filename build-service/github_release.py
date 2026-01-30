@@ -18,11 +18,21 @@ class GitHubReleaser:
     """Handles GitHub release creation and asset uploads."""
 
     def __init__(self):
+        self.github = None
+        self.repo = None
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """Lazy initialization - only connect when needed."""
+        if self._initialized:
+            return
+
         if not config.GITHUB_TOKEN:
             raise ValueError("GITHUB_TOKEN environment variable not set")
 
         self.github = Github(config.GITHUB_TOKEN)
         self.repo = self.github.get_repo(config.GITHUB_REPO)
+        self._initialized = True
         logger.info(f"Connected to GitHub repo: {config.GITHUB_REPO}")
 
     def create_release(self, version: str, apk_path: Path,
@@ -38,6 +48,7 @@ class GitHubReleaser:
         Returns:
             URL to the uploaded APK asset
         """
+        self._ensure_initialized()
         tag_name = f"v{version}"
         release_name = f"IOCast v{version}"
 
@@ -80,6 +91,7 @@ class GitHubReleaser:
 
     def get_latest_release(self) -> Optional[dict]:
         """Get information about the latest release."""
+        self._ensure_initialized()
         try:
             release = self.repo.get_latest_release()
             return {
@@ -103,6 +115,7 @@ class GitHubReleaser:
 
     def list_releases(self, limit: int = 10) -> list:
         """List recent releases."""
+        self._ensure_initialized()
         releases = []
         for release in self.repo.get_releases()[:limit]:
             releases.append({
