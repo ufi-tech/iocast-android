@@ -29,8 +29,23 @@ class AndroidBuilder:
         self.cancelled = False
 
     def clone_repo(self, branch: str = "main") -> Path:
-        """Clone the GitHub repository."""
-        self.work_dir = Path(tempfile.mkdtemp(prefix="iocast-build-"))
+        """Clone the GitHub repository.
+
+        Note: We use /app/cache for builds because when running Docker-in-Docker,
+        the path must be accessible to the host Docker daemon. /app/cache is
+        mounted as a host volume in docker-compose.yml.
+        """
+        # Use /app/cache which is mounted from host - this makes it accessible
+        # to sibling containers started via Docker-in-Docker
+        cache_base = Path(config.BUILD_CACHE_DIR)
+        cache_base.mkdir(parents=True, exist_ok=True)
+
+        # Create unique build directory
+        import uuid
+        build_id = str(uuid.uuid4())[:8]
+        self.work_dir = cache_base / f"build-{build_id}"
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+
         repo_url = f"https://github.com/{config.GITHUB_REPO}.git"
 
         logger.info(f"Cloning {repo_url} branch {branch} to {self.work_dir}")
@@ -112,15 +127,19 @@ class AndroidBuilder:
         logger.info("Running Gradle build in Docker container")
 
         try:
-            # Ensure repo_dir is absolute path
-            repo_dir_abs = str(repo_dir.resolve())
-            logger.info(f"Mounting {repo_dir_abs} to /project")
+            # For Docker-in-Docker: convert container path to host path
+            # /app/cache inside this container maps to /opt/iocast-build-service/build-cache on host
+            host_cache_base = "/opt/iocast-build-service/build-cache"
+            build_dir_name = repo_dir.name  # e.g., "build-abc12345"
+            host_repo_dir = f"{host_cache_base}/{build_dir_name}"
+
+            logger.info(f"Container path: {repo_dir}, Host path for DinD: {host_repo_dir}")
 
             self.container = self.docker_client.containers.run(
                 config.DOCKER_IMAGE,
                 command=f"bash -c '{build_command}'",
                 volumes={
-                    repo_dir_abs: {'bind': '/project', 'mode': 'rw'}
+                    host_repo_dir: {'bind': '/project', 'mode': 'rw'}
                 },
                 working_dir="/project",
                 remove=False,

@@ -8,8 +8,9 @@ services:
     volumes:
       # Docker socket for running builds
       - /var/run/docker.sock:/var/run/docker.sock
-      # Build cache (speeds up subsequent builds)
-      - build-cache:/app/cache
+      # Build cache - MUST be a host path for Docker-in-Docker to work
+      # Both this container and the Android build container need to access it
+      - /opt/iocast-build-service/build-cache:/app/cache
       # Local releases storage
       - ./releases:/app/releases
     environment:
@@ -32,10 +33,6 @@ services:
         max-file: "3"
     networks:
       - default
-
-volumes:
-  build-cache:
-    driver: local
 
 networks:
   default:
