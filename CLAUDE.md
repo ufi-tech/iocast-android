@@ -9,7 +9,9 @@
 | **Package** | dk.iocast.kiosk |
 | **Tech Stack** | Kotlin + HiveMQ MQTT + WebView |
 | **Min SDK** | Android 7.0 (API 24) |
-| **GitHub** | TBD |
+| **GitHub** | [ufi-tech/iocast-android](https://github.com/ufi-tech/iocast-android) |
+| **Current Version** | 1.3.0 (versionCode 8) |
+| **APK Download** | [GitHub Releases](https://github.com/ufi-tech/iocast-android/releases) |
 
 ## Hvad er IOCast?
 
@@ -80,31 +82,49 @@ iocast-android/
 └── CLAUDE.md
 ```
 
-## Build med Docker (Anbefalet)
+## Build via MQTT (Anbefalet)
 
-Ingen Android Studio eller SDK installation påkrævet!
+Automatiseret build service der bygger APK og uploader til GitHub Releases.
 
 ```bash
-# Byg debug APK
-./build-apk.sh
+# Trigger build (husk at opdatere version og versionCode!)
+source admin-platform/.env  # eller brug password direkte
+mosquitto_pub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
+  -t "build/iocast-android/trigger" \
+  -m '{"branch":"main","version":"1.4.0","versionCode":9}'
 
-# Byg release APK
-./build-apk.sh release
-
-# Eller med docker-compose
-docker-compose run --rm build
-
-# Start shell i build container
-docker-compose run --rm shell
+# Monitor build progress
+mosquitto_sub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
+  -t "build/iocast-android/#" -v
 ```
 
-**Output:** `output/iocast-debug.apk` eller `output/iocast-release.apk`
+**Build stages:**
+1. Clone repository
+2. Update version in build.gradle.kts
+3. Build APK via Docker (cimg/android:2024.01.1 med Java 17)
+4. Upload til GitHub Releases
 
-**Docker image:** [mingc/android-build-box](https://hub.docker.com/r/mingc/android-build-box/) (~16GB)
+**Build service:** Kører på `ufitechbox-docker-01` (172.18.0.101)
 
-## Build med Gradle (Lokal)
+**Skill:** Brug `/iocast-build` for fuld dokumentation
 
-Kræver Android Studio eller Android SDK installeret.
+## Build med Docker (Lokal fallback)
+
+```bash
+# Byg debug APK lokalt
+rm -rf /tmp/iocast-clean && mkdir -p /tmp/iocast-clean
+git archive HEAD | tar -x -C /tmp/iocast-clean
+docker run --rm -v /tmp/iocast-clean:/project -w /project cimg/android:2024.01.1 \
+  bash -c "chmod +x gradlew && ./gradlew assembleDebug --no-daemon"
+cp /tmp/iocast-clean/app/build/outputs/apk/debug/app-debug.apk releases/
+```
+
+**VIGTIGT:** Brug kun `cimg/android:2024.01.1` imaget der er cached lokalt med Java 17.
+Nyere versions fra Docker Hub har Java 21 som bryder buildet!
+
+## Build med Gradle (Android Studio)
+
+Kræver Android Studio eller Android SDK med Java 17.
 
 ```bash
 # Build debug APK
@@ -140,4 +160,36 @@ Admin Platform: infoscreen-admin (same repo)
   "deviceId": "abc123",
   "startUrl": "https://kunde.iocast.dk/display"
 }
+```
+
+## Build Service Administration
+
+**SSH til build server:**
+```bash
+ssh -J ingress-01 ubuntu@172.18.0.101
+```
+
+**Service location:** `/opt/iocast-build-service/build-service/`
+
+**Service commands:**
+```bash
+# Check logs
+ssh -J ingress-01 ubuntu@172.18.0.101 \
+  "docker compose -f /opt/iocast-build-service/build-service/docker-compose.yml logs --tail=50"
+
+# Restart service
+ssh -J ingress-01 ubuntu@172.18.0.101 \
+  "cd /opt/iocast-build-service/build-service && docker compose restart"
+```
+
+## GitHub Releases
+
+APK'er uploades automatisk til: https://github.com/ufi-tech/iocast-android/releases
+
+```bash
+# List releases
+gh release list --repo ufi-tech/iocast-android
+
+# Download latest APK
+gh release download --repo ufi-tech/iocast-android --pattern "*.apk"
 ```
