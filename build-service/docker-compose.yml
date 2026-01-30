@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  build-service:
+    build: .
+    container_name: iocast-build-service
+    restart: unless-stopped
+    volumes:
+      # Docker socket for running builds
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Build cache (speeds up subsequent builds)
+      - build-cache:/app/cache
+      # Local releases storage
+      - ./releases:/app/releases
+    environment:
+      # MQTT Configuration
+      - MQTT_HOST=${MQTT_HOST:-188.228.60.134}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USER=${MQTT_USER:-admin}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - MQTT_CLIENT_ID=${MQTT_CLIENT_ID:-iocast-build-service}
+      # GitHub Configuration
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO:-ufi-tech/iocast-android}
+      # Build Configuration
+      - BUILD_TIMEOUT=${BUILD_TIMEOUT:-1800}
+      - DOCKER_IMAGE=${DOCKER_IMAGE:-mingc/android-build-box:latest}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
+volumes:
+  build-cache:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
