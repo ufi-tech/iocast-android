@@ -14,6 +14,7 @@ import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import dk.iocast.kiosk.config.ProvisionConfig
 import dk.iocast.kiosk.util.DeviceInfo
+import dk.iocast.kiosk.util.DeviceType
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -51,6 +52,7 @@ class SetupTvActivity : AppCompatActivity() {
     private var enteredCode = ""
     private var mqttClient: Mqtt3AsyncClient? = null
     private var deviceId: String = ""
+    private var isTV = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +60,10 @@ class SetupTvActivity : AppCompatActivity() {
 
         // Initialize device ID
         deviceId = IOCastApp.instance.prefs.deviceId
+
+        // Detect device type
+        isTV = DeviceType.isTV(this)
+        Log.d(TAG, "Device type: ${DeviceType.getDescription(this)}, isTV=$isTV")
 
         // Find views
         codeDisplay = findViewById(R.id.codeDisplay)
@@ -69,11 +75,35 @@ class SetupTvActivity : AppCompatActivity() {
         waitingCustomerName = findViewById(R.id.waitingCustomerName)
         numpadGrid = findViewById(R.id.numpadGrid)
 
-        // Setup numpad buttons
+        // Setup UI based on device type
+        setupForDeviceType()
+
+        // Setup numpad buttons (always, for touch fallback)
         setupNumpadButtons()
 
         // Update display
         updateCodeDisplay()
+    }
+
+    /**
+     * Configure UI based on device type:
+     * - TV: Hide numpad, use remote number keys directly
+     * - Tablet/Phone: Show numpad for touch input
+     */
+    private fun setupForDeviceType() {
+        if (isTV) {
+            // On TV: Hide numpad, user uses remote control number keys
+            numpadGrid.visibility = View.GONE
+            statusText.text = "Brug fjernbetjeningen til at indtaste koden"
+
+            // Find subtitle and update it
+            findViewById<TextView>(R.id.subtitleText)?.text =
+                "Tryk på tallene på fjernbetjeningen"
+        } else {
+            // On tablet/phone: Show numpad for touch
+            numpadGrid.visibility = View.VISIBLE
+            statusText.text = "Tryk på tallene for at indtaste koden"
+        }
     }
 
     private fun setupNumpadButtons() {
@@ -412,7 +442,8 @@ class SetupTvActivity : AppCompatActivity() {
         loadingContainer.visibility = View.GONE
         waitingContainer.visibility = View.GONE
 
-        numpadGrid.visibility = View.VISIBLE
+        // Show numpad only on non-TV devices
+        numpadGrid.visibility = if (isTV) View.GONE else View.VISIBLE
         codeDisplay.visibility = View.VISIBLE
         statusText.visibility = View.VISIBLE
 
@@ -430,7 +461,11 @@ class SetupTvActivity : AppCompatActivity() {
         // Reset status color after delay
         statusText.postDelayed({
             statusText.setTextColor(getColor(android.R.color.darker_gray))
-            statusText.text = "Tryk på tal-knapper eller naviger med D-pad"
+            statusText.text = if (isTV) {
+                "Brug fjernbetjeningen til at indtaste koden"
+            } else {
+                "Tryk på tallene for at indtaste koden"
+            }
         }, 5000)
     }
 

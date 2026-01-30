@@ -30,4 +30,16 @@
         <item name="strokeWidth">2dp</item>
         <item name="backgroundTint">@android:color/transparent</item>
     </style>
+
+    <!-- Compact numpad button style for TV -->
+    <style name="NumpadButtonCompact" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textSize">24sp</item>
+        <item name="android:minWidth">64dp</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="strokeColor">@color/primary</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+    </style>
 </resources>
