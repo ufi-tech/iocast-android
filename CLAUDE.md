@@ -43,8 +43,8 @@ IOCast er en Android kiosk-app der:
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Admin godkender i dashboard                                │
-│  (infoscreen-admin platform)                                │
+│  Backend matcher kundekode (CustomerCode tabel)             │
+│  auto_approve=true → godkendes automatisk                   │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -52,18 +52,58 @@ IOCast er en Android kiosk-app der:
 │  MQTT Provision Response                                    │
 │                                                             │
 │  Topic: provision/{code}/response/{deviceId}                │
-│  Payload: { approved: true, startUrl, brokerUrl, ... }      │
+│  Payload: {                                                 │
+│    approved: true,                                          │
+│    startUrl: "https://kunde.screen.iocast.dk/screen/...",   │
+│    brokerUrl: "tcp://188.228.60.134:1883",                  │
+│    username: "admin",                                       │
+│    password: "****",                                        │
+│    kioskMode: true,                                         │
+│    keepScreenOn: true,                                      │
+│    customerId: "uuid",                                      │
+│    customerName: "Kundens Navn"                             │
+│  }                                                          │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  MainActivity starter med konfigureret WebView              │
+│  App gemmer config i SharedPreferences:                     │
+│  - broker_url, username, password (til MqttService)         │
+│  - start_url, current_url (til WebView)                     │
+│  - setup_complete = true                                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MainActivity starter:                                      │
+│  - WebView loader startUrl                                  │
+│  - MqttService starter med credentials fra prefs            │
+│  - Subscribes til devices/{deviceId}/cmd/#                  │
+│  - Sender telemetri hvert 60. sekund                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Hardcoded MQTT credentials** i `ProvisionConfig.kt`:
+### Provisioning via API
+
+Opret en kundekode i backend:
+```bash
+# Opret customer code med auto-approve
+curl -X POST "https://admin.screen.iocast.dk/api/customer-codes" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "1234",
+    "customer_id": "uuid-her",
+    "start_url": "https://kunde.screen.iocast.dk/screen/uuid",
+    "auto_approve": true,
+    "kiosk_mode": true,
+    "keep_screen_on": true
+  }'
+```
+
+**Hardcoded MQTT credentials** i `ProvisionConfig.kt` (kun til provisioning):
 - Broker: `188.228.60.134:1883`
-- Credentials baked into APK
+- Credentials baked into APK for initial connection
+- Efter provisioning bruger app credentials fra response
 
 ## MQTT Topics
 
