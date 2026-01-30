@@ -151,6 +151,7 @@ class AndroidBuilder:
                 working_dir="/project",
                 remove=False,
                 detach=True,
+                user="root",  # Run as root to avoid permission issues with mounted volumes
                 environment={
                     "GRADLE_USER_HOME": "/project/.gradle"
                 }
