@@ -113,15 +113,19 @@ class AndroidBuilder:
         if progress_callback:
             progress_callback(10, "Starting build container")
 
-        # Run the build - list files first for debugging, then build
+        # Run the build with clean Gradle home to avoid cache issues
         build_command = """
+            export GRADLE_USER_HOME=/tmp/gradle-home && \
+            mkdir -p $GRADLE_USER_HOME && \
             echo "=== Working directory ===" && \
             pwd && \
             echo "=== Files ===" && \
             ls -la && \
+            echo "=== Java version ===" && \
+            java -version 2>&1 && \
             echo "=== Starting build ===" && \
             chmod +x gradlew && \
-            ./gradlew assembleRelease --no-daemon --stacktrace
+            ./gradlew assembleRelease --no-daemon --stacktrace --gradle-user-home=$GRADLE_USER_HOME
         """
 
         logger.info("Running Gradle build in Docker container")
