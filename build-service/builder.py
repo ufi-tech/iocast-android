@@ -101,14 +101,17 @@ class AndroidBuilder:
         logger.info(f"Starting Docker build with image {config.DOCKER_IMAGE}")
 
         if progress_callback:
-            progress_callback(0, "Pulling Docker image")
+            progress_callback(0, "Checking Docker image")
 
-        # Pull the image if needed
+        # Verify the image exists (do NOT pull - we use a pre-loaded Java 17 version)
         try:
             self.docker_client.images.get(config.DOCKER_IMAGE)
+            logger.info(f"Using pre-loaded Docker image {config.DOCKER_IMAGE}")
         except docker.errors.ImageNotFound:
-            logger.info(f"Pulling Docker image {config.DOCKER_IMAGE}")
-            self.docker_client.images.pull(config.DOCKER_IMAGE)
+            raise RuntimeError(
+                f"Docker image {config.DOCKER_IMAGE} not found. "
+                "This image must be pre-loaded with Java 17 - do not pull from Docker Hub."
+            )
 
         if progress_callback:
             progress_callback(10, "Starting build container")
@@ -125,7 +128,7 @@ class AndroidBuilder:
             java -version 2>&1 && \
             echo "=== Starting build ===" && \
             chmod +x gradlew && \
-            ./gradlew assembleRelease --no-daemon --stacktrace --gradle-user-home=$GRADLE_USER_HOME
+            ./gradlew assembleDebug --no-daemon --stacktrace --gradle-user-home=$GRADLE_USER_HOME
         """
 
         logger.info("Running Gradle build in Docker container")
