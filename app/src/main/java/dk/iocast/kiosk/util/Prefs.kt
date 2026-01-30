@@ -22,6 +22,7 @@ class Prefs(context: Context) {
         private const val KEY_CURRENT_URL = "current_url"
         private const val KEY_KIOSK_MODE = "kiosk_mode"
         private const val KEY_SCREEN_ON = "screen_on"
+        private const val KEY_PENDING_UPDATE_DOWNLOAD_ID = "pending_update_download_id"
     }
 
     var isSetupComplete: Boolean
@@ -81,6 +82,10 @@ class Prefs(context: Context) {
     var keepScreenOn: Boolean
         get() = prefs.getBoolean(KEY_SCREEN_ON, true)
         set(value) = prefs.edit().putBoolean(KEY_SCREEN_ON, value).apply()
+
+    var pendingUpdateDownloadId: Long
+        get() = prefs.getLong(KEY_PENDING_UPDATE_DOWNLOAD_ID, -1L)
+        set(value) = prefs.edit().putLong(KEY_PENDING_UPDATE_DOWNLOAD_ID, value).apply()
 
     private fun generateDeviceId(): String {
         return "iocast-${UUID.randomUUID().toString().take(8)}"

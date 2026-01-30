@@ -9,6 +9,61 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Offline Clock Overlay - shown when network is unavailable -->
+    <LinearLayout
+        android:id="@+id/offlineClockLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@color/black"
+        android:visibility="gone">
+
+        <TextClock
+            android:id="@+id/offlineClock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:format24Hour="HH:mm"
+            android:format12Hour="HH:mm"
+            android:textColor="@android:color/white"
+            android:textSize="180sp"
+            android:fontFamily="sans-serif-thin" />
+
+        <TextClock
+            android:id="@+id/offlineDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:format24Hour="EEEE, d. MMMM yyyy"
+            android:format12Hour="EEEE, d. MMMM yyyy"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="36sp"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/offlineStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ingen internetforbindelse"
+            android:textColor="@android:color/holo_orange_light"
+            android:textSize="18sp"
+            android:layout_marginTop="48dp" />
+
+        <!-- WiFi Setup Button -->
+        <Button
+            android:id="@+id/wifiSetupButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Opsæt WiFi"
+            android:textSize="16sp"
+            android:layout_marginTop="24dp"
+            android:paddingHorizontal="32dp"
+            android:paddingVertical="12dp"
+            style="?android:attr/borderlessButtonStyle"
+            android:background="@android:color/darker_gray"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
+
     <ProgressBar
         android:id="@+id/progressBar"
         style="@style/Widget.AppCompat.ProgressBar.Horizontal"

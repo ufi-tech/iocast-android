@@ -5,10 +5,12 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import dk.iocast.kiosk.IOCastApp
 import dk.iocast.kiosk.util.DeviceInfo
+import dk.iocast.kiosk.util.TvController
 import org.json.JSONObject
 import java.util.Locale
 
@@ -62,6 +64,15 @@ class CommandHandler(private val context: Context) {
                 "screenshot" -> handleScreenshot()
                 "clearCache" -> handleClearCache()
                 "setStartUrl" -> handleSetStartUrl(json)
+                "openWifiSettings" -> handleOpenWifiSettings()
+                "openSettings" -> handleOpenSettings(json)
+                // TV Control commands
+                "setBrightness" -> handleSetBrightness(json)
+                "getBrightness" -> handleGetBrightness()
+                "sleep" -> handleSleep()
+                "wakeUp" -> handleWakeUp()
+                "setScreenTimeout" -> handleSetScreenTimeout(json)
+                "shutdown" -> handleShutdown()
                 else -> CommandResult(false, "Unknown command: $command")
             }
         } catch (e: Exception) {
@@ -194,6 +205,120 @@ class CommandHandler(private val context: Context) {
 
         IOCastApp.instance.prefs.startUrl = url
         return CommandResult(true, "Start URL set to: $url")
+    }
+
+    private fun handleOpenWifiSettings(): CommandResult {
+        return try {
+            val intent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            CommandResult(true, "WiFi settings opened")
+        } catch (e: Exception) {
+            CommandResult(false, "Failed to open WiFi settings: ${e.message}")
+        }
+    }
+
+    private fun handleOpenSettings(json: JSONObject): CommandResult {
+        val settingsType = json.optString("type", "wifi")
+        return try {
+            val action = when (settingsType) {
+                "wifi" -> Settings.ACTION_WIFI_SETTINGS
+                "bluetooth" -> Settings.ACTION_BLUETOOTH_SETTINGS
+                "display" -> Settings.ACTION_DISPLAY_SETTINGS
+                "sound" -> Settings.ACTION_SOUND_SETTINGS
+                "date" -> Settings.ACTION_DATE_SETTINGS
+                "location" -> Settings.ACTION_LOCATION_SOURCE_SETTINGS
+                "apps" -> Settings.ACTION_APPLICATION_SETTINGS
+                "network" -> Settings.ACTION_WIRELESS_SETTINGS
+                else -> Settings.ACTION_SETTINGS
+            }
+            val intent = Intent(action).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            CommandResult(true, "Settings ($settingsType) opened")
+        } catch (e: Exception) {
+            CommandResult(false, "Failed to open settings: ${e.message}")
+        }
+    }
+
+    // ========== TV Control Commands ==========
+
+    private fun handleSetBrightness(json: JSONObject): CommandResult {
+        val level = json.optInt("level", -1)
+        if (level < 0 || level > 100) {
+            return CommandResult(false, "Brightness level must be 0-100")
+        }
+
+        return if (TvController.setBrightnessPercent(context, level)) {
+            val data = JSONObject().apply {
+                put("brightness", level)
+                put("brightnessRaw", TvController.getBrightness(context))
+            }
+            CommandResult(true, "Brightness set to $level%", data)
+        } else {
+            CommandResult(false, "Failed to set brightness - permission may be required")
+        }
+    }
+
+    private fun handleGetBrightness(): CommandResult {
+        val brightness = TvController.getBrightnessPercent(context)
+        val brightnessRaw = TvController.getBrightness(context)
+        val screenTimeout = TvController.getScreenTimeout(context)
+        val screenOn = TvController.isScreenOn(context)
+
+        val data = JSONObject().apply {
+            put("brightness", brightness)
+            put("brightnessRaw", brightnessRaw)
+            put("screenTimeout", screenTimeout)
+            put("screenOn", screenOn)
+        }
+
+        return CommandResult(true, "Brightness: $brightness%", data)
+    }
+
+    private fun handleSleep(): CommandResult {
+        return if (TvController.goToSleep(context)) {
+            CommandResult(true, "Device going to sleep")
+        } else {
+            CommandResult(false, "Failed to put device to sleep - may require system privileges")
+        }
+    }
+
+    private fun handleWakeUp(): CommandResult {
+        return if (TvController.wakeUp(context)) {
+            CommandResult(true, "Screen woken up")
+        } else {
+            CommandResult(false, "Failed to wake screen")
+        }
+    }
+
+    private fun handleSetScreenTimeout(json: JSONObject): CommandResult {
+        // Timeout in seconds, convert to milliseconds
+        val timeoutSeconds = json.optInt("timeout", -1)
+        if (timeoutSeconds < 0) {
+            return CommandResult(false, "Missing or invalid 'timeout' parameter (seconds)")
+        }
+
+        val timeoutMs = timeoutSeconds * 1000
+        return if (TvController.setScreenTimeout(context, timeoutMs)) {
+            val data = JSONObject().apply {
+                put("timeoutSeconds", timeoutSeconds)
+                put("timeoutMs", timeoutMs)
+            }
+            CommandResult(true, "Screen timeout set to ${timeoutSeconds}s", data)
+        } else {
+            CommandResult(false, "Failed to set screen timeout")
+        }
+    }
+
+    private fun handleShutdown(): CommandResult {
+        return if (TvController.shutdown()) {
+            CommandResult(true, "Shutting down device")
+        } else {
+            CommandResult(false, "Shutdown failed - requires root or device owner")
+        }
     }
 
     private fun sendCommandToActivity(command: String, payload: String?) {

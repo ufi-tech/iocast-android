@@ -3,7 +3,11 @@ package dk.iocast.kiosk.service
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -20,6 +24,7 @@ import dk.iocast.kiosk.R
 import dk.iocast.kiosk.command.CommandHandler
 import dk.iocast.kiosk.mqtt.MqttConfig
 import dk.iocast.kiosk.util.DeviceInfo
+import dk.iocast.kiosk.util.ScreenshotHelper
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
@@ -50,10 +55,63 @@ class MqttService : Service() {
 
     private lateinit var commandHandler: CommandHandler
 
+    // Screenshot result receiver
+    private val screenshotReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            intent?.let { handleScreenshotResult(it) }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         commandHandler = CommandHandler(this)
+        registerScreenshotReceiver()
         Log.d(TAG, "MqttService created")
+    }
+
+    private fun registerScreenshotReceiver() {
+        val filter = IntentFilter("dk.iocast.kiosk.SCREENSHOT_RESULT")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenshotReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenshotReceiver, filter)
+        }
+    }
+
+    private fun handleScreenshotResult(intent: Intent) {
+        val success = intent.getBooleanExtra("success", false)
+        val cfg = config ?: return
+
+        if (success) {
+            val base64 = intent.getStringExtra("base64") ?: return
+            Log.d(TAG, "Publishing screenshot (${base64.length} bytes)")
+
+            // Create screenshot data and publish
+            val screenshotData = ScreenshotHelper.createScreenshotData(base64, cfg.deviceId)
+            val topic = "devices/${cfg.deviceId}/screenshot"
+            publish(topic, screenshotData.toString(), retain = false)
+
+            // Also publish ack
+            val ackPayload = JSONObject().apply {
+                put("command", "screenshot")
+                put("success", true)
+                put("message", "Screenshot captured and published")
+                put("sizeBytes", base64.length)
+                put("timestamp", System.currentTimeMillis() / 1000)
+            }.toString()
+            publish(cfg.cmdAckTopic("screenshot"), ackPayload, retain = false)
+        } else {
+            val error = intent.getStringExtra("error") ?: "Unknown error"
+            Log.e(TAG, "Screenshot failed: $error")
+
+            val ackPayload = JSONObject().apply {
+                put("command", "screenshot")
+                put("success", false)
+                put("message", error)
+                put("timestamp", System.currentTimeMillis() / 1000)
+            }.toString()
+            publish(cfg.cmdAckTopic("screenshot"), ackPayload, retain = false)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -74,6 +132,11 @@ class MqttService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(telemetryRunnable)
+        try {
+            unregisterReceiver(screenshotReceiver)
+        } catch (e: Exception) {
+            // Receiver not registered
+        }
         disconnect()
         Log.d(TAG, "MqttService destroyed")
     }

@@ -24,6 +24,14 @@
     <!-- Vibrate for feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Location for device tracking (optional) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- Read phone state for serial number (optional) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
     <application
         android:name=".IOCastApp"
         android:allowBackup="true"
@@ -52,10 +60,17 @@
             </intent-filter>
         </activity>
 
-        <!-- Setup Activity (first run / QR scan) -->
+        <!-- Setup Activity (first run / QR scan - legacy) -->
         <activity
             android:name=".SetupActivity"
             android:exported="false"
+            android:theme="@style/Theme.IOCast" />
+
+        <!-- TV Setup Activity (numpad provision code) -->
+        <activity
+            android:name=".SetupTvActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.IOCast" />
 
         <!-- MQTT Foreground Service -->

@@ -6,8 +6,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
@@ -19,20 +27,62 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dk.iocast.kiosk.service.MqttService
+import dk.iocast.kiosk.util.ScreenshotHelper
 import dk.iocast.kiosk.webview.JsInterface
 
 /**
  * Main kiosk activity with fullscreen WebView
+ * Features:
+ * - Offline clock display when network is unavailable
+ * - Auto-reload when network returns
+ * - WiFi setup access
  */
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
+    private lateinit var offlineClockLayout: LinearLayout
+    private lateinit var offlineStatus: TextView
+    private lateinit var wifiSetupButton: Button
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var isNetworkAvailable = true
+    private var pendingUrlToLoad: String? = null
+
+    // Network callback for monitoring connectivity changes
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.d(TAG, "Network available")
+            handler.post { onNetworkRestored() }
+        }
+
+        override fun onLost(network: Network) {
+            Log.d(TAG, "Network lost")
+            handler.post { onNetworkLost() }
+        }
+
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            val hasInternet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            Log.d(TAG, "Network capabilities changed: internet=$hasInternet, validated=$validated")
+            if (hasInternet && validated) {
+                handler.post { onNetworkRestored() }
+            }
+        }
+    }
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -43,9 +93,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Check if setup is complete
+        // Check if setup is complete - use TV-friendly setup with numpad
         if (!IOCastApp.instance.prefs.isSetupComplete) {
-            startActivity(Intent(this, SetupActivity::class.java))
+            startActivity(Intent(this, SetupTvActivity::class.java))
             finish()
             return
         }
@@ -53,12 +103,109 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         setupFullscreen()
+        setupViews()
         setupWebView()
+        setupNetworkMonitor()
         registerCommandReceiver()
         startMqttService()
 
-        // Load the start URL
-        loadUrl(IOCastApp.instance.prefs.currentUrl)
+        // Check initial network state and load URL
+        if (isNetworkConnected()) {
+            loadUrl(IOCastApp.instance.prefs.currentUrl)
+        } else {
+            showOfflineClock()
+            pendingUrlToLoad = IOCastApp.instance.prefs.currentUrl
+        }
+    }
+
+    private fun setupViews() {
+        offlineClockLayout = findViewById(R.id.offlineClockLayout)
+        offlineStatus = findViewById(R.id.offlineStatus)
+        wifiSetupButton = findViewById(R.id.wifiSetupButton)
+
+        wifiSetupButton.setOnClickListener {
+            openWifiSettings()
+        }
+    }
+
+    private fun setupNetworkMonitor() {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        connectivityManager.registerNetworkCallback(request, networkCallback)
+
+        // Set initial state
+        isNetworkAvailable = isNetworkConnected()
+    }
+
+    private fun isNetworkConnected(): Boolean {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    private fun onNetworkRestored() {
+        if (!isNetworkAvailable) {
+            Log.d(TAG, "Network restored - reloading content")
+            isNetworkAvailable = true
+            showWebView()
+
+            // Reload the pending URL or current URL
+            val urlToLoad = pendingUrlToLoad ?: IOCastApp.instance.prefs.currentUrl
+            pendingUrlToLoad = null
+
+            // Small delay to ensure network is stable
+            handler.postDelayed({
+                if (isNetworkAvailable) {
+                    loadUrl(urlToLoad)
+                }
+            }, 1500)
+        }
+    }
+
+    private fun onNetworkLost() {
+        if (isNetworkAvailable) {
+            Log.d(TAG, "Network lost - showing offline clock")
+            isNetworkAvailable = false
+            pendingUrlToLoad = webView.url ?: IOCastApp.instance.prefs.currentUrl
+            showOfflineClock()
+        }
+    }
+
+    private fun showOfflineClock() {
+        runOnUiThread {
+            webView.visibility = View.GONE
+            progressBar.visibility = View.GONE
+            offlineClockLayout.visibility = View.VISIBLE
+            offlineStatus.text = "Ingen internetforbindelse"
+        }
+    }
+
+    private fun showWebView() {
+        runOnUiThread {
+            offlineClockLayout.visibility = View.GONE
+            webView.visibility = View.VISIBLE
+        }
+    }
+
+    private fun openWifiSettings() {
+        try {
+            // Try Android TV WiFi settings first
+            val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not open WiFi settings: ${e.message}")
+            try {
+                // Fallback to general wireless settings
+                val fallbackIntent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
+                startActivity(fallbackIntent)
+            } catch (e2: Exception) {
+                Toast.makeText(this, "Kan ikke åbne WiFi indstillinger", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupFullscreen() {
@@ -132,7 +279,13 @@ class MainActivity : AppCompatActivity() {
                 super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
                     progressBar.visibility = View.GONE
-                    // Could load offline page here
+                    Log.d(TAG, "WebView error: ${error?.description}")
+
+                    // Show offline clock on network errors
+                    if (!isNetworkConnected()) {
+                        pendingUrlToLoad = request.url?.toString() ?: IOCastApp.instance.prefs.currentUrl
+                        showOfflineClock()
+                    }
                 }
             }
         }
@@ -212,8 +365,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun takeScreenshot() {
-        // Screenshot implementation - will be handled by MqttService
-        sendBroadcast(Intent("dk.iocast.kiosk.SCREENSHOT_REQUEST"))
+        Log.d(TAG, "Taking screenshot...")
+
+        // Capture the WebView content
+        ScreenshotHelper.captureWebView(webView, object : ScreenshotHelper.ScreenshotCallback {
+            override fun onSuccess(base64: String, file: java.io.File?) {
+                Log.d(TAG, "Screenshot captured, size: ${base64.length} bytes")
+
+                // Send broadcast with screenshot data for MqttService to publish
+                val intent = Intent("dk.iocast.kiosk.SCREENSHOT_RESULT").apply {
+                    putExtra("base64", base64)
+                    putExtra("success", true)
+                    file?.let { putExtra("filePath", it.absolutePath) }
+                }
+                sendBroadcast(intent)
+            }
+
+            override fun onError(message: String) {
+                Log.e(TAG, "Screenshot failed: $message")
+                val intent = Intent("dk.iocast.kiosk.SCREENSHOT_RESULT").apply {
+                    putExtra("success", false)
+                    putExtra("error", message)
+                }
+                sendBroadcast(intent)
+            }
+        })
+    }
+
+    /**
+     * Get WebView for external screenshot capture
+     */
+    fun getWebView(): WebView? {
+        return if (::webView.isInitialized) webView else null
     }
 
     // Block back button in kiosk mode
@@ -262,6 +445,13 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             // Receiver not registered
         }
+        try {
+            val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            // Callback not registered
+        }
+        handler.removeCallbacksAndMessages(null)
         if (::webView.isInitialized) {
             webView.destroy()
         }
