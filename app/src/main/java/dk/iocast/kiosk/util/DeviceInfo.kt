@@ -23,6 +23,8 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.io.InputStreamReader
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 /**
  * Collects device information for telemetry
@@ -320,9 +322,34 @@ object DeviceInfo {
     }
 
     /**
-     * Get device IP address
+     * Get device IP address (supports both WiFi and Ethernet)
      */
     private fun getIpAddress(context: Context): String {
+        // First try NetworkInterface (works for both WiFi and Ethernet)
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                // Skip loopback and down interfaces
+                if (networkInterface.isLoopback || !networkInterface.isUp) continue
+
+                val addresses = networkInterface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    // Only return IPv4 addresses, skip loopback
+                    if (!address.isLoopbackAddress && address is Inet4Address) {
+                        val ip = address.hostAddress
+                        if (ip != null && ip != "0.0.0.0") {
+                            return ip
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "NetworkInterface IP lookup failed: ${e.message}")
+        }
+
+        // Fallback to WifiManager (only works for WiFi)
         return try {
             val wifiManager = context.applicationContext
                 .getSystemService(Context.WIFI_SERVICE) as WifiManager

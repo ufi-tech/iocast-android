@@ -74,9 +74,6 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // QR Code Scanner
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 

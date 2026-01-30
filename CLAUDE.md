@@ -10,7 +10,7 @@
 | **Tech Stack** | Kotlin + HiveMQ MQTT + WebView |
 | **Min SDK** | Android 7.0 (API 24) |
 | **GitHub** | [ufi-tech/iocast-android](https://github.com/ufi-tech/iocast-android) |
-| **Current Version** | 1.3.0 (versionCode 8) |
+| **Current Version** | 1.1.0 (versionCode 7) |
 | **APK Download** | [GitHub Releases](https://github.com/ufi-tech/iocast-android/releases) |
 
 ## Hvad er IOCast?
@@ -19,14 +19,57 @@ IOCast er en Android kiosk-app der:
 - Viser en webside i fullscreen (digital signage)
 - Modtager kommandoer via MQTT (tovejs!)
 - Auto-starter ved boot
-- Setup via QR-kode scanning
+- Provisioning via 4-cifret kundekode
 - Integrerer med infoscreen-admin platform
+
+## Provisioning Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SetupTvActivity - Numpad/Remote Code Entry                 │
+│                                                             │
+│  Bruger indtaster 4-cifret kundekode:                       │
+│  - Touch numpad (tablet/phone)                              │
+│  - Tal-taster på TV fjernbetjening                          │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MQTT Provision Request                                     │
+│                                                             │
+│  Topic: provision/{code}/request                            │
+│  Payload: { deviceId, customerCode, timestamp, deviceInfo } │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Admin godkender i dashboard                                │
+│  (infoscreen-admin platform)                                │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MQTT Provision Response                                    │
+│                                                             │
+│  Topic: provision/{code}/response/{deviceId}                │
+│  Payload: { approved: true, startUrl, brokerUrl, ... }      │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MainActivity starter med konfigureret WebView              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Hardcoded MQTT credentials** i `ProvisionConfig.kt`:
+- Broker: `188.228.60.134:1883`
+- Credentials baked into APK
 
 ## MQTT Topics
 
 ```
 devices/{deviceId}/status      → Publish: online/offline + LWT
-devices/{deviceId}/telemetry   → Publish: batteri, wifi, etc.
+devices/{deviceId}/telemetry   → Publish: batteri, wifi, IP, etc.
 devices/{deviceId}/events      → Publish: screenOn, screenOff, etc.
 devices/{deviceId}/cmd/+       → Subscribe: kommandoer
 devices/{deviceId}/cmd/+/ack   → Publish: acknowledgment
@@ -55,30 +98,29 @@ iocast-android/
 │   │   ├── java/dk/iocast/kiosk/
 │   │   │   ├── IOCastApp.kt           # Application class
 │   │   │   ├── MainActivity.kt        # Kiosk WebView
-│   │   │   ├── SetupActivity.kt       # QR setup
+│   │   │   ├── SetupTvActivity.kt     # Numpad/remote provisioning
 │   │   │   ├── service/
 │   │   │   │   └── MqttService.kt     # MQTT foreground service
+│   │   │   ├── config/
+│   │   │   │   └── ProvisionConfig.kt # Hardcoded MQTT broker
 │   │   │   ├── mqtt/
-│   │   │   │   ├── MqttClient.kt      # HiveMQ wrapper
-│   │   │   │   └── MqttConfig.kt      # Connection config
+│   │   │   │   └── MqttConfig.kt      # Runtime MQTT config
 │   │   │   ├── command/
-│   │   │   │   ├── CommandHandler.kt  # Dispatcher
-│   │   │   │   └── Commands.kt        # Command implementations
+│   │   │   │   └── CommandHandler.kt  # Command dispatcher
 │   │   │   ├── receiver/
 │   │   │   │   ├── BootReceiver.kt    # Auto-start
 │   │   │   │   └── ScreenReceiver.kt  # Screen events
 │   │   │   ├── webview/
-│   │   │   │   ├── KioskWebView.kt    # Custom WebView
 │   │   │   │   └── JsInterface.kt     # JavaScript bridge
 │   │   │   └── util/
-│   │   │       ├── DeviceInfo.kt      # System info collector
+│   │   │       ├── DeviceInfo.kt      # Telemetri collector
+│   │   │       ├── DeviceType.kt      # TV/tablet detection
 │   │   │       └── Prefs.kt           # SharedPreferences
 │   │   ├── res/
 │   │   └── AndroidManifest.xml
 │   └── build.gradle.kts
 ├── build.gradle.kts
 ├── settings.gradle.kts
-├── gradle.properties
 └── CLAUDE.md
 ```
 
@@ -91,7 +133,7 @@ Automatiseret build service der bygger APK og uploader til GitHub Releases.
 source admin-platform/.env  # eller brug password direkte
 mosquitto_pub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
   -t "build/iocast-android/trigger" \
-  -m '{"branch":"main","version":"1.4.0","versionCode":9}'
+  -m '{"branch":"main","version":"1.2.0","versionCode":8}'
 
 # Monitor build progress
 mosquitto_sub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
@@ -122,44 +164,48 @@ cp /tmp/iocast-clean/app/build/outputs/apk/debug/app-debug.apk releases/
 **VIGTIGT:** Brug kun `cimg/android:2024.01.1` imaget der er cached lokalt med Java 17.
 Nyere versions fra Docker Hub har Java 21 som bryder buildet!
 
-## Build med Gradle (Android Studio)
-
-Kræver Android Studio eller Android SDK med Java 17.
-
-```bash
-# Build debug APK
-./gradlew assembleDebug
-
-# Install on connected device
-./gradlew installDebug
-
-# Build release APK
-./gradlew assembleRelease
-```
-
 ## Backend Integration
 
 MQTT Broker: 188.228.60.134:1883
 Admin Platform: infoscreen-admin (same repo)
 
-## Onboarding Flow
+## Telemetri Data
 
-1. Bruger installerer IOCast APK
-2. App starter → SetupActivity
-3. Bruger scanner QR-kode fra admin dashboard
-4. App forbinder til MQTT, viser startUrl
-5. Device registreres automatisk i admin
+DeviceInfo.kt sender følgende i `devices/{id}/telemetry`:
 
-## QR Payload Format
+| Felt | Beskrivelse |
+|------|-------------|
+| deviceId | Unik device identifier |
+| timestamp | Unix timestamp |
+| appVersion | IOCast app version |
+| androidVersion | Android OS version |
+| manufacturer | Device manufacturer |
+| model | Device model |
+| batteryLevel | Batteri % |
+| batteryCharging | true/false |
+| batteryTemperature | Celsius |
+| cpuTemperature | Celsius (hvis tilgængelig) |
+| networkConnected | true/false |
+| wifiSsid | WiFi netværksnavn |
+| wifiSignal | RSSI (dBm) |
+| ipAddress | Device IP adresse |
+| macAddress | WiFi MAC adresse |
+| memoryTotal/Free | RAM i MB |
+| storageTotal/Free | Disk i MB |
+| screenOn | true/false |
+| uptime | Sekunder siden boot |
+| currentUrl | Aktuel WebView URL |
 
-```json
-{
-  "broker": "tcp://188.228.60.134:1883",
-  "username": "device-abc123",
-  "password": "auto-generated",
-  "deviceId": "abc123",
-  "startUrl": "https://kunde.iocast.dk/display"
-}
+## GitHub Releases
+
+APK'er uploades automatisk til: https://github.com/ufi-tech/iocast-android/releases
+
+```bash
+# List releases
+gh release list --repo ufi-tech/iocast-android
+
+# Download latest APK
+gh release download --repo ufi-tech/iocast-android --pattern "*.apk"
 ```
 
 ## Build Service Administration
@@ -180,16 +226,4 @@ ssh -J ingress-01 ubuntu@172.18.0.101 \
 # Restart service
 ssh -J ingress-01 ubuntu@172.18.0.101 \
   "cd /opt/iocast-build-service/build-service && docker compose restart"
-```
-
-## GitHub Releases
-
-APK'er uploades automatisk til: https://github.com/ufi-tech/iocast-android/releases
-
-```bash
-# List releases
-gh release list --repo ufi-tech/iocast-android
-
-# Download latest APK
-gh release download --repo ufi-tech/iocast-android --pattern "*.apk"
 ```
