@@ -98,8 +98,13 @@ class AndroidBuilder:
         if progress_callback:
             progress_callback(10, "Starting build container")
 
-        # Run the build
+        # Run the build - list files first for debugging, then build
         build_command = """
+            echo "=== Working directory ===" && \
+            pwd && \
+            echo "=== Files ===" && \
+            ls -la && \
+            echo "=== Starting build ===" && \
             chmod +x gradlew && \
             ./gradlew assembleRelease --no-daemon --stacktrace
         """
@@ -107,11 +112,15 @@ class AndroidBuilder:
         logger.info("Running Gradle build in Docker container")
 
         try:
+            # Ensure repo_dir is absolute path
+            repo_dir_abs = str(repo_dir.resolve())
+            logger.info(f"Mounting {repo_dir_abs} to /project")
+
             self.container = self.docker_client.containers.run(
                 config.DOCKER_IMAGE,
                 command=f"bash -c '{build_command}'",
                 volumes={
-                    str(repo_dir): {'bind': '/project', 'mode': 'rw'}
+                    repo_dir_abs: {'bind': '/project', 'mode': 'rw'}
                 },
                 working_dir="/project",
                 remove=False,
