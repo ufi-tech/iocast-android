@@ -161,7 +161,37 @@ adb install iocast-v1.0.5-ack-fix.apk
 
 ---
 
-## IOCast Provisioning på Tablet
+## Quick Provisioning (Anbefalet)
+
+Brug det automatiske provisioning script:
+
+```bash
+cd iocast-android
+
+# Med auto-detect device
+./provision-tablet.sh
+
+# Med specifik device serial
+./provision-tablet.sh HVA3SSH4
+
+# Med specifik APK
+./provision-tablet.sh HVA3SSH4 iocast-v1.0.6.apk
+```
+
+Scriptet gør automatisk:
+- Installerer IOCast APK
+- Sætter IOCast som default launcher
+- Deaktiverer andre launchers
+- Deaktiverer bloatware og opdateringer
+- Deaktiverer lock screen
+- Slukker lyd og notifikationer
+- Konfigurerer skærm til altid-på
+
+---
+
+## Manuel Provisioning
+
+Hvis du vil gøre det manuelt:
 
 ### 1. Installer APK
 
@@ -182,14 +212,32 @@ adb shell cmd package set-home-activity dk.iocast.kiosk/.MainActivity
 adb shell pm disable-user --user 0 com.lenovo.browser
 adb shell pm disable-user --user 0 com.lenovo.lsf.user
 adb shell pm disable-user --user 0 com.lenovo.lfh
+adb shell pm disable-user --user 0 com.lenovo.ota
+adb shell pm disable-user --user 0 com.tblenovo.launcher
 
 # Google apps
 adb shell pm disable-user --user 0 com.android.vending  # Play Store
-adb shell pm disable-user --user 0 com.google.android.youtube
-adb shell pm disable-user --user 0 com.google.android.gm  # Gmail
+adb shell pm disable-user --user 0 com.google.android.setupwizard
 ```
 
-### 4. Skærm-indstillinger
+### 4. Deaktiver Lock Screen
+
+```bash
+adb shell locksettings clear --old ''
+adb shell locksettings set-disabled true
+adb shell settings put secure lockscreen.disabled 1
+```
+
+### 5. Deaktiver Lyd
+
+```bash
+adb shell settings put system volume_music 0
+adb shell settings put system volume_ring 0
+adb shell settings put system volume_notification 0
+adb shell settings put global heads_up_notifications_enabled 0
+```
+
+### 6. Skærm-indstillinger
 
 ```bash
 # Slå skærm-timeout fra

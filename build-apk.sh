@@ -47,8 +47,9 @@ docker run --rm $PLATFORM_FLAG \
         echo '📋 Accepting Android SDK licenses...'
         yes | sdkmanager --licenses 2>/dev/null || true
 
-        echo '🔨 Running Gradle build (using container Gradle)...'
-        gradle $GRADLE_TASK --no-daemon --stacktrace
+        echo '🔨 Running Gradle build (using gradlew)...'
+        chmod +x ./gradlew
+        ./gradlew $GRADLE_TASK --no-daemon --stacktrace
     "
 
 # Check if APK was created
