@@ -340,11 +340,15 @@ class SetupTvActivity : AppCompatActivity() {
         try {
             val response = JSONObject(payload)
 
-            when (response.optString("status")) {
-                "approved" -> {
-                    Log.d(TAG, "Device approved!")
+            // Handle both formats:
+            // Format 1: {"status": "approved", "config": {...}}
+            // Format 2: {"approved": true, "startUrl": "...", ...}
+            val status = response.optString("status", "")
+            val isApproved = response.optBoolean("approved", false)
 
-                    // Extract configuration
+            when {
+                status == "approved" -> {
+                    Log.d(TAG, "Device approved (status field)!")
                     val config = response.optJSONObject("config")
                     if (config != null) {
                         saveConfigAndStart(config)
@@ -352,12 +356,16 @@ class SetupTvActivity : AppCompatActivity() {
                         showError("Ugyldig konfiguration modtaget")
                     }
                 }
-                "rejected" -> {
+                isApproved -> {
+                    Log.d(TAG, "Device approved (approved field)!")
+                    // Config is at root level, not nested
+                    saveConfigAndStart(response)
+                }
+                status == "rejected" -> {
                     val reason = response.optString("reason", "Ukendt årsag")
                     showError("Anmodning afvist: $reason")
                 }
-                "pending" -> {
-                    // Still waiting, update customer name if available
+                status == "pending" -> {
                     val customerName = response.optString("customerName", "")
                     if (customerName.isNotEmpty()) {
                         waitingCustomerName.text = "Kunde: $customerName"
