@@ -1,0 +1,4 @@
+
+# Signing keystore (DO NOT COMMIT - use base64 env var instead)
+signing/*.jks
+signing/keystore-base64.txt

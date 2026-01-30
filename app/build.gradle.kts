@@ -11,19 +11,38 @@ android {
         applicationId = "dk.iocast.kiosk"
         minSdk = 24
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.8.0"
+        versionCode = 15
+        versionName = "1.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Signing config - keystore injected via environment variable in CI/CD
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: "signing/iocast-release.jks"
+            val keystoreFile = file(keystorePath)
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "iocast2026release"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "iocast"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "iocast2026release"
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // Also use release signing for debug builds to ensure consistent signature
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
