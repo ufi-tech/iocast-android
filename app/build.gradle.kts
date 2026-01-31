@@ -11,8 +11,8 @@ android {
         applicationId = "dk.iocast.kiosk"
         minSdk = 24
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.9.0"
+        versionCode = 16
+        versionName = "2.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
