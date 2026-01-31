@@ -198,8 +198,10 @@ class AndroidBuilder:
             if self.container:
                 try:
                     self.container.remove()
-                except:
-                    pass
+                except docker.errors.APIError as e:
+                    logger.warning(f"Failed to remove container: {e}")
+                except Exception as e:
+                    logger.warning(f"Unexpected error removing container: {e}")
                 self.container = None
 
         # Find the built APK
@@ -237,8 +239,10 @@ class AndroidBuilder:
         if self.container:
             try:
                 self.container.stop(timeout=5)
-            except:
-                pass
+            except docker.errors.APIError as e:
+                logger.warning(f"Failed to stop container: {e}")
+            except Exception as e:
+                logger.warning(f"Unexpected error stopping container: {e}")
 
     def cleanup(self):
         """Clean up temporary files."""

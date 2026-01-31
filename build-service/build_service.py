@@ -27,6 +27,22 @@ logging.basicConfig(
 logger = logging.getLogger("BuildService")
 
 
+def validate_config():
+    """Validate required configuration at startup."""
+    errors = []
+
+    if not config.MQTT_PASSWORD:
+        errors.append("MQTT_PASSWORD environment variable is not set")
+
+    if not config.GITHUB_TOKEN:
+        errors.append("GITHUB_TOKEN environment variable is not set")
+
+    if errors:
+        for error in errors:
+            logger.error(f"Configuration error: {error}")
+        raise ValueError(f"Missing required configuration: {', '.join(errors)}")
+
+
 class BuildService:
     """Main build service that listens for MQTT commands."""
 
@@ -293,5 +309,9 @@ class BuildService:
 
 
 if __name__ == "__main__":
+    # Validate configuration before starting
+    validate_config()
+    logger.info(f"Using Docker image: {config.DOCKER_IMAGE}")
+
     service = BuildService()
     service.run()
