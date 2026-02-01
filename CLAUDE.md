@@ -10,7 +10,7 @@
 | **Tech Stack** | Kotlin + HiveMQ MQTT + WebView |
 | **Min SDK** | Android 7.0 (API 24) |
 | **GitHub** | [ufi-tech/iocast-android](https://github.com/ufi-tech/iocast-android) |
-| **Current Version** | 1.1.0 (versionCode 7) |
+| **Current Version** | 2.0.5 (versionCode 17) |
 | **APK Download** | [GitHub Releases](https://github.com/ufi-tech/iocast-android/releases) |
 
 ## Hvad er IOCast?
@@ -164,45 +164,32 @@ iocast-android/
 └── CLAUDE.md
 ```
 
-## Build via MQTT (Anbefalet)
+## Build & Release
 
-Automatiseret build service der bygger APK og uploader til GitHub Releases.
-
-```bash
-# Trigger build (husk at opdatere version og versionCode!)
-source admin-platform/.env  # eller brug password direkte
-mosquitto_pub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
-  -t "build/iocast-android/trigger" \
-  -m '{"branch":"main","version":"1.2.0","versionCode":8}'
-
-# Monitor build progress
-mosquitto_sub -h 188.228.60.134 -u admin -P "$MQTT_PASSWORD" \
-  -t "build/iocast-android/#" -v
-```
-
-**Build stages:**
-1. Clone repository
-2. Update version in build.gradle.kts
-3. Build APK via Docker (cimg/android:2024.01.1 med Java 17)
-4. Upload til GitHub Releases
-
-**Build service:** Kører på `ufitechbox-docker-01` (172.18.0.101)
-
-**Skill:** Brug `/iocast-build` for fuld dokumentation
-
-## Build med Docker (Lokal fallback)
+Build ny APK med det automatiserede build script:
 
 ```bash
-# Byg debug APK lokalt
-rm -rf /tmp/iocast-clean && mkdir -p /tmp/iocast-clean
-git archive HEAD | tar -x -C /tmp/iocast-clean
-docker run --rm -v /tmp/iocast-clean:/project -w /project cimg/android:2024.01.1 \
-  bash -c "chmod +x gradlew && ./gradlew assembleDebug --no-daemon"
-cp /tmp/iocast-clean/app/build/outputs/apk/debug/app-debug.apk releases/
+# Auto-increment patch version (2.0.4 → 2.0.5)
+./build-release.sh
+
+# Specificér custom version
+./build-release.sh 2.1.0
+
+# Specificér både version og versionCode
+./build-release.sh 2.1.0 18
 ```
 
-**VIGTIGT:** Brug kun `cimg/android:2024.01.1` imaget der er cached lokalt med Java 17.
-Nyere versions fra Docker Hub har Java 21 som bryder buildet!
+**Hvad scriptet gør:**
+- Læser nuværende version fra `build.gradle.kts`
+- Trigger MQTT build på remote server (ufitechbox-docker-01)
+- Viser real-time progress bar
+- Sender macOS notifikation når færdig
+- Uploader til GitHub Releases
+- Viser download URL, SHA256 og deployment vejledning
+
+**Dependencies:** `brew install mosquitto jq`
+
+**Troubleshooting:** Se `build-release.sh` eller `/iocast-build` skill for detaljer
 
 ## Backend Integration
 
@@ -238,32 +225,24 @@ DeviceInfo.kt sender følgende i `devices/{id}/telemetry`:
 
 ## GitHub Releases
 
-APK'er uploades automatisk til: https://github.com/ufi-tech/iocast-android/releases
+Alle builds uploades automatisk til: https://github.com/ufi-tech/iocast-android/releases
 
-```bash
-# List releases
-gh release list --repo ufi-tech/iocast-android
+Download seneste APK: `gh release download --repo ufi-tech/iocast-android --pattern "*.apk"`
 
-# Download latest APK
-gh release download --repo ufi-tech/iocast-android --pattern "*.apk"
-```
+## Scripts Oversigt
 
-## Build Service Administration
+| Script | Formål | Status |
+|--------|--------|--------|
+| **build-release.sh** | 🚀 MQTT build + monitoring + notifikationer | ✅ **Primær** |
+| **provision-tablet.sh** | Provisionér tablets (Lenovo Tab M10) til kiosk mode | ✅ **Aktiv** |
+| **provision-tv.sh** | Provisionér Android TVs (Thomson 240G) til kiosk mode | ✅ **Aktiv** |
+| **revert-tv.sh** | Nulstil TV til normal tilstand | ✅ **Utility** |
+| **emulator-test.sh** | Test APK i Android emulator (kun dev) | 🔧 **Dev only** |
+| **test-apk.sh** | Test APK på fysisk device via USB (kun dev) | 🔧 **Dev only** |
+| **.deprecated/build-apk.sh** | ~~Lokal Docker build~~ | ⛔ **Deprecated** |
 
-**SSH til build server:**
-```bash
-ssh -J ingress-01 ubuntu@172.18.0.101
-```
-
-**Service location:** `/opt/iocast-build-service/build-service/`
-
-**Service commands:**
-```bash
-# Check logs
-ssh -J ingress-01 ubuntu@172.18.0.101 \
-  "docker compose -f /opt/iocast-build-service/build-service/docker-compose.yml logs --tail=50"
-
-# Restart service
-ssh -J ingress-01 ubuntu@172.18.0.101 \
-  "cd /opt/iocast-build-service/build-service && docker compose restart"
-```
+**Build service scripts** (kører på server):
+- `build-service/build_service.py` - MQTT listener
+- `build-service/builder.py` - Docker build logic
+- `build-service/github_release.py` - GitHub releases integration
+- `build-service/config.py` - Configuration
